@@ -1,0 +1,106 @@
+
+  
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, fig.width = 8, fig.height = 7)
+
+library(dplyr)
+library(prophet)
+library(xts)
+library(highcharter)
+
+
+chicagocrimes20122017 <- read.csv("C:/Users/saatc/Downloads/Datasets/crimes-in-chicago/Chicago_Crimes_2012_to_2017.csv")
+
+chicagocrimes20122015 <- chicagocrimes20122017[chicagocrimes20122017$Year %in% c('2012', '2013', '2014', '2015'), c('Date', 'ID')]
+
+
+
+## Creating timeseries
+chicagocrimes20122015$Date <- as.Date(chicagocrimes20122015$Date, "%m/%d/%Y %I:%M:%S %p")
+by_Date <- na.omit(chicagocrimes20122015) %>% group_by(Date) %>% summarise(Total = n())
+tseries <- xts(by_Date$Total, order.by=as.POSIXct(by_Date$Date))
+
+
+df <- chicagocrimes20122015 %>% group_by(Date) %>% summarise(y = n()) %>% mutate(y = log(y))
+
+names(df) <- c("ds", "y")
+df$ds <- factor(df$ds)
+
+
+```
+
+
+
+### Times Series plot of Chicago Crimes 2012-2016
+
+
+```{r}
+
+hchart(tseries, name = "Crimes") %>%
+  hc_add_theme(hc_theme_darkunica()) %>%
+  hc_credits(enabled = TRUE, text = "Sources: City of Chicago Administration and the Chicago Police Department", style = list(fontSize = "12px")) %>%
+  hc_title(text = "Times Series plot of Chicago Crimes") %>%
+  hc_legend(enabled = TRUE)
+
+```
+
+
+### Overview of Prophet(Facebook's Forecasting R Package)
+
+* Prophet is a procedure for forecasting time series data. It is based on an additive model where non-linear trends are fit with yearly and weekly seasonality, plus holidays. It works best with daily periodicity data with at least one year of historical data. Prophet is robust to missing data, shifts in the trend, and large outliers.
+
+* Prophet is open source software released by Facebook's Core Data Science team.
+
+### Fitting the model
+
+```{r}
+
+m <- prophet(df)
+
+```
+
+### Creating dataframe with historical dates and future dates to forecast
+
+```{r}
+
+future <- make_future_dataframe(m, periods = 365 * 4)
+
+head(future)
+
+tail(future)
+
+```
+
+### Forecasting by using predict method
+
+```{r}
+
+forecast <- predict(m, future)
+
+tail(forecast[c('ds', 'yhat', 'yhat_lower', 'yhat_upper')])
+
+```
+
+
+
+### Basic plotting of the forecast
+
+```{r}
+
+plot(m, forecast)
+
+```
+
+
+### Plotting forecast broken down into trend, weekly and yearly
+
+```{r}
+
+prophet_plot_components(m, forecast)
+
+```
+
+
+
+
